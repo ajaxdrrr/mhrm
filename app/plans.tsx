@@ -4,9 +4,10 @@ import { auth, db } from "@/lib/firebase";
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { onValue, ref } from "firebase/database";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react"; // 👈 useRef added
 import {
   Alert,
+  Modal, // 👈 Modal added
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,8 +17,6 @@ import {
 
 const XENDIT_CREATE_URL =
   "https://mhrm.jpyseyersoled.workers.dev/create-xendit-invoice";
-const XENDIT_CHECK_URL =
-  "https://mhrm.jpyseyersoled.workers.dev/check-xendit-invoice";
 
 export default function PlansScreen() {
   const router = useRouter();
@@ -25,6 +24,9 @@ export default function PlansScreen() {
   const [isPaidPlan, setIsPaidPlan] = useState(false);
   const [loadingPlan, setLoadingPlan] = useState(true);
   const [upgrading, setUpgrading] = useState(false);
+  const [showPaymentSuccess, setShowPaymentSuccess] = useState(false); // 👈 NEW
+
+  const prevPaymentRef = useRef<boolean | null>(null); // 👈 track previous payment state
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
@@ -37,7 +39,20 @@ export default function PlansScreen() {
     const userRef = ref(db, `users/${uid}`);
     const off = onValue(userRef, (snap) => {
       const val = snap.val() ?? {};
-      setIsPaidPlan(!!val.payment);
+      const payment = !!val.payment;
+
+      // Detect transition: false -> true (but ignore the very first null -> value)
+      if (prevPaymentRef.current === false && payment === true) {
+        setShowPaymentSuccess(true);
+      }
+
+      if (prevPaymentRef.current === null) {
+        // first load, don't show modal even if already Pro
+      }
+
+      prevPaymentRef.current = payment; // update previous value
+
+      setIsPaidPlan(payment);
       setLoadingPlan(false);
     });
 
@@ -46,7 +61,7 @@ export default function PlansScreen() {
 
   const handleUpgradeToPro = async () => {
     const uid = auth.currentUser?.uid;
-  
+
     if (!uid) {
       Alert.alert(
         "Sign in required",
@@ -61,10 +76,10 @@ export default function PlansScreen() {
       );
       return;
     }
-  
+
     try {
       setUpgrading(true);
-  
+
       const res = await fetch(XENDIT_CREATE_URL, {
         method: "POST",
         headers: {
@@ -76,23 +91,23 @@ export default function PlansScreen() {
           userId: uid,
         }),
       });
-  
+
       if (!res.ok) {
         const text = await res.text();
         console.log("Xendit worker error:", text);
         throw new Error(text || "Failed to create invoice");
       }
-  
+
       const data: any = await res.json();
       const invoiceUrl = data?.invoice_url;
-  
+
       if (!invoiceUrl) {
         console.log("Invalid Xendit worker response:", data);
         throw new Error("No invoice_url returned from server");
       }
-  
+
       await WebBrowser.openBrowserAsync(invoiceUrl);
-  
+      // Worker + Firebase will handle payment flag; listener above shows the modal.
     } catch (err: any) {
       console.error("Upgrade error:", err);
       Alert.alert(
@@ -103,10 +118,35 @@ export default function PlansScreen() {
       setUpgrading(false);
     }
   };
-  
 
   return (
     <ThemedView style={styles.container}>
+      {/* ✅ Payment success modal */}
+      <Modal
+        visible={showPaymentSuccess}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPaymentSuccess(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Payment successful</Text>
+            <Text style={styles.modalBody}>
+              Your payment has been confirmed and your account has been upgraded
+              to the Pro plan. You now have unlimited monthly receipt scans and
+              priority processing.
+            </Text>
+
+            <Pressable
+              style={styles.modalButton}
+              onPress={() => setShowPaymentSuccess(false)}
+            >
+              <Text style={styles.modalButtonText}>Got it</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       <View style={styles.header}>
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
           <Text style={styles.backIcon}>◀</Text>
@@ -187,6 +227,9 @@ export default function PlansScreen() {
 
           <View style={styles.featureList}>
             <Text style={styles.featureItem}>
+              • Unlimited budget plan creation per month
+            </Text>
+            <Text style={styles.featureItem}>
               • Unlimited receipt scans per month
             </Text>
             <Text style={styles.featureItem}>• Priority OCR processing</Text>
@@ -197,10 +240,7 @@ export default function PlansScreen() {
 
           {!loadingPlan && !isPaidPlan && (
             <Pressable
-              style={[
-                styles.proCtaBtn,
-                upgrading && { opacity: 0.7 },
-              ]}
+              style={[styles.proCtaBtn, upgrading && { opacity: 0.7 }]}
               disabled={upgrading}
               onPress={handleUpgradeToPro}
             >
@@ -356,5 +396,47 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#6B7280",
     marginTop: 8,
+  },
+
+  // Modal styles
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalCard: {
+    width: "85%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111827",
+    marginBottom: 8,
+  },
+  modalBody: {
+    fontSize: 13,
+    color: "#4B5563",
+    marginBottom: 16,
+  },
+  modalButton: {
+    alignSelf: "flex-end",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    backgroundColor: "#4F46E5",
+  },
+  modalButtonText: {
+    color: "#F9FAFB",
+    fontWeight: "600",
+    fontSize: 13,
   },
 });
