@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "601236250659",
+    "project_id": "mhrm-a0b26",
+    "storage_bucket": "mhrm-a0b26.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:601236250659:android:7a58fa6b0e3236b0f49196",
+        "android_client_info": {
+          "package_name": "com.ggajax.mhrm"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "601236250659-h8l04s83ch1cvg70jumkju0tpno47u15.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCC-AfEkiYxRxiEoy5yZ2pbgCkRktWtxr0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "601236250659-h8l04s83ch1cvg70jumkju0tpno47u15.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
